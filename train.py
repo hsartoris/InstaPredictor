@@ -1,6 +1,7 @@
 import tensorflow as tf
 import os
 import numpy as np
+from Model import Model
 
 batchSize = 32
 imSize = 250
@@ -20,12 +21,14 @@ for fname in os.listdir(dataDir):
         files.append(dataDir + fname)
 
 batches_per_epoch = int(len(files)/batchSize)
+numFiles = len(files)
 
 files = tf.constant(files)
 likes = tf.constant(np.expand_dims(np.loadtxt(dataDir + "ids", dtype=int),1))
 
 dataset = tf.data.Dataset.from_tensor_slices((files, likes))
-dataset = dataset.map(_parse_function).batch(batchSize)
+dataset = dataset.map(_parse_function).shuffle(numFiles*2)
+dataset = dataset.repeat().batch(batchSize)
 iterator = dataset.make_initializable_iterator()
 iter_init_op = iterator.make_initializer(dataset)
 
@@ -58,17 +61,21 @@ _images, _likes = iterator.get_next()
 
 #report_tensor_allocations_upon_oom
 m = Model(_images, _likes)
-loss = m.loss
 train_op = m.train
-
+loss_op = m.loss
     
 init = tf.global_variables_initializer()
+runOptions = tf.RunOptions(report_tensor_allocations_upon_oom = True)
+
+
 epochs = 100
 with tf.Session() as sess:
     sess.run(init)
     sess.run(iter_init_op)
     for e in range(epochs):
+        print("Epoch", e)
         for eStep in range(batches_per_epoch):
-            _, lossval = sess.run([train_op, loss])
-            loss = np.sum(lossval)/batchSize
-        print("epoch", e,"\tloss:", loss)
+            _, loss = sess.run([train_op, loss_op], options=runOptions)
+            lossAvg = np.sum(loss)/batchSize
+            print("Epoch step", eStep)
+        print("epoch", e,"\tloss:", lossAvg)
