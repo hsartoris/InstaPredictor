@@ -1,66 +1,47 @@
 import tensorflow as tf
-import os
-import numpy as np
 
-batchSize = 64
-imSize = 500
-c1k=50
+class Model():
+    def __init__(self, _images, _likes, kernel_size=25, imSize=250):
+        self._images = images
+        self._likes = _likes
+        self.kernel_size = kernel_size
+        self.imSize = imSize
+        self.optimizer = tf.train.AdamOptimizer()
 
-def _parse_function(fname, likes):
-    image_str = tf.read_file(fname)
-    image_decoded = tf.image.decode_jpeg(image_str)
-    image_resized = tf.image.resize_images(image_decoded, [imSize,imSize])
-    return image_resized, likes
+    @lazy_property
+    def conv1(self):
+        input_layer = tf.reshape(self._images, [-1, self.imSize, self.imSize, 3])
+        conv = tf.layers.conv2d(input_layer, filters=32, 
+            kernel_size=self.kernel_size, padding="same", activation=tf.nn.relu)
+        return tf.layers.max_pooling2d(conv, pool_size=[2,2], strides=2)
 
-dataDir = "images/processed/"
+    @lazy_property
+    def conv2(self):
+        conv = tf.layers.conv2d(self.conv1, filters=64, 
+            kernel_size=self.kernel_size, padding="same", activation=tf.nn.relu)
+        return tf.layers.max_pooling2d(conv, pool_size=[2,2], strides=2)
 
-files = []
-for fname in os.listdir(dataDir):
-    if ".jpg" in fname:
-        files.append(dataDir + fname)
+    @lazy_property
+    def dense(self):
+        data = self.conv2
+        ds = data.get_shape().as_list()
+        pool2flat = tf.reshape(self.conv2, [-1, ds[1] * ds[2] * ds[3]])
+        dense = tf.layers.dense(pool2flat, units=1024, activation=tf.nn.relu)
+        return datashapletf.layers.dropout(dense, rate=.4)
 
-batches_per_epoch = int(len(files)/batchSize)
+    @lazy_property
+    def logits(self):
+        return tf.layers.dense(self.dense, units=1)
 
-files = tf.constant(files)
-likes = tf.constant(np.loadtxt(dataDir + "ids", dtype=int))
+    @lazy_property
+    def pred(self):
+        return self.logits
 
-dataset = tf.data.Dataset.from_tensor_slices((files, likes))
-dataset = dataset.map(_parse_function).batch(batchSize)
-iterator = dataset.make_initializable_iterator()
-iter_init_op = iterator.make_initializer(dataset)
+    @lazy_property
+    def loss(self):
+        return tf.losses.mean_squared_error(self._likes, self.logits)
 
-_images, _likes = iterator.get_next()
-
-
-    
-input_layer = tf.reshape(_images, [-1,500,500,3])
-conv1 = tf.layers.conv2d(inputs=input_layer, filters=32, kernel_size=c1k,
-    padding="same", activation=tf.nn.relu)
-pool1 = tf.layers.max_pooling2d(inputs=conv1,pool_size=[2,2], strides=2)
-conv2 = tf.layers.conv2d(inputs=pool1, filters=64, kernel_size=c1k,
-    padding="same", activation=tf.nn.relu)
-pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2,2], strides=2)
-pool2shape = pool2.get_shape().as_list()
-pool2size = pool2shape[1] * pool2shape[2] * pool2shape[3]
-
-pool2_flat = tf.reshape(pool2, [-1, pool2size])
-dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
-dropout = tf.layers.dropout(inputs=dense, rate=.4)
-
-logits = tf.layers.dense(inputs=dropout, units=1)
-predictions = logits
-
-loss = tf.losses.mean_squared_error(_likes, logits)
-optimizer = tf.train.AdamOptimizer()
-train_op = optimizer.minimize(loss)
-    
-init = tf.global_variables_initializer()
-epochs = 100
-with tf.Session() as sess:
-    sess.run(init)
-    sess.run(iter_init_op)
-    for e in range(epochs):
-        for eStep in range(batches_per_epoch):
-            _, lossval = sess.run([train_op, loss])
-            loss = np.sum(lossval)/batchSize
-        print("epoch", e,"\tloss:", loss)
+    @lazy_property
+    def train(self):
+        return self.optimizer.minimize(self.loss)
+        
