@@ -18,6 +18,7 @@ def scrape_user(instaDir, user):
         info = dict()
         info['likes'] = post['edge_media_preview_like']['count']
         info['media'] = post['display_url'].split("/")[-1]
+        info['timestamp'] = int(post['taken_at_timestamp'])
         if not os.path.exists(userDir + info['media']):
             print("Couldn't find post media: " + info['media'])
             missed += 1
