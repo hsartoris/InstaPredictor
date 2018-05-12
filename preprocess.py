@@ -4,7 +4,7 @@ import numpy as np
 userFile = "users.txt.bak"
 
 
-def scrape_user(instaDir, user):
+def scrape_user(instaDir, user, validateMedia=True):
     posts = []
     userDir = instaDir + user + "/"
     data = None
@@ -19,7 +19,7 @@ def scrape_user(instaDir, user):
         info['likes'] = post['edge_media_preview_like']['count']
         info['media'] = post['display_url'].split("/")[-1]
         info['timestamp'] = int(post['taken_at_timestamp'])
-        if not os.path.exists(userDir + info['media']):
+        if not os.path.exists(userDir + info['media']) and validateMedia:
             print("Couldn't find post media: " + info['media'])
             missed += 1
             continue
