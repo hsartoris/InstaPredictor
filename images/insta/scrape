@@ -3,4 +3,4 @@ echo -n "Enter username: "
 read user
 echo -n "Enter password: "
 read -s pass
-instagram-scraper -f users.txt --media-types image --include-location -u $user -p $pass
+instagram-scraper artichokestheworld --retry-forever --media-types image --include-location -u $user -p $pass
